@@ -38,7 +38,7 @@ dataframes = {
     'google': 'data/GOOG-edited.csv',
     'netflix': 'data/NFLX-edited.csv',
     'tesla': 'data/TSLA-edited.csv',
-    'bitcoin': 'data/BCHAIN-NEW.csv'
+    'bitcoin': 'data/BTC-USD-edited.csv',
 }
 
 def choose_df():
@@ -48,8 +48,11 @@ def choose_df():
 
     wait = True
     while wait:
+        #handles input if your using python 3
         if sys.version.startswith('3'):
             info = input('Please Specify the name of the dataframe: ')
+            
+        #handles input if you are using python 2
         elif sys.version.startswith('2'):
             info = raw_input('Please Specify the name of the dataframe: ')
 
@@ -68,7 +71,7 @@ def choose_df():
 
 def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, withdraw_amount=None):
     global main_key, game_record, predictions, past_predictions
-    #print(user_key)
+    
     if user_key == None:
         player_name = 'player_{0}'.format(main_key)
         user_key = main_key
@@ -76,14 +79,21 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
         
         if start_date != None:
             result = df[df['Date'] == start_date].index.tolist()
+            
+            #find start date by index
             if result:
                 start_index = result[0]
+            
+            #if date isn't found because of wrong date format or something reverts to default start index
             else:
                 start_index = 0
+                print('Start Date Not Found. First Date is {0}'.format(df['Date'][0]))
+        
         else:
             start_index = 0
         
         if player_name not in game_record.keys():
+            print('Player ID not Found, new record being created.')
             game_record[player_name] = {
                 'dys_without_activity': 0,
                 'amount': amount,
@@ -100,6 +110,7 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
             
             player_record = game_record[player_name]
         else:
+            print('Old Player ID Found, data will be appended to it.)
             player_record = game_record[player_name]
         
         
@@ -112,25 +123,40 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
         return (user_key, day_info, amount, 0, 0, 0, False)
     
     elif user_key != None:
-        #print('found user key', user_key)
         player_name = 'player_{0}'.format(user_key)
         if player_name in game_record.keys():
+            
+            print('Old Player ID Found, data will be appended to it.)
             player_record = game_record[player_name]
         else:
-            print('Error in player name not found, game terminating')
-            return (0, 0, 0, 0, 0, 0, True)
+            
+            print('Player ID not Found, new record being created.')
+            game_record[player_name] = {
+                'dys_without_activity': 0,
+                'amount': amount,
+                'last_game': 0,
+                'game_history': {},
+                'invested': 0,
+                'investment_break_down': {}, #buying price & amount investment, day_id
+                'withdraw_breakdown': {}, #day_id withdraw, withdraw amount, stock price
+                'start_index': start_index,
+                'current_date': start_index,
+                'invest_history': [],
+                'amount_history': [],
+            }
+            
+            player_record = game_record[player_name]
         
         #move one day into the future
-        #print(player_record['current_date'])
         player_record['current_date'] += 1
-        #print(player_record['current_date'])
+
         current_date = player_record['current_date']
         
         if current_date > df.shape[0]-1: #last row
             print('Reached the final day, game ending')
             
-            day_info = df.iloc[current_date-1]
-            prev_day_info = df.iloc[current_date-2]
+            day_info = df.iloc[current_date - 1]
+            prev_day_info = df.iloc[current_date - 2]
             
             prev_price = prev_day_info[1]
             today_price = day_info[1]
@@ -150,7 +176,7 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
             return (user_key, day_info, player_record['amount'], player_record['invested'], profit, loss, True)
         
         day_info = df.iloc[current_date]
-        prev_day_info = df.iloc[current_date-1]
+        prev_day_info = df.iloc[current_date - 1]
         
         prev_price = prev_day_info[1]
         today_price = day_info[1]
@@ -227,20 +253,22 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
     
     return (user_key, day_info, player_record['amount'], player_record['invested'], profit, loss, False)
 
+#there is one "unrealistic part" of this predictor, it does multiple daily investments in a single loop                 
 def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True, miss_output=False, miss_plot=False, show_exception=True, kind='line'):
-    user_key, day_info, amount, invested, profit, loss, game_active = stock_game(start_date=start_date)
+    user_key, day_info, amount, invested, profit, loss, game_finished = stock_game(start_date=start_date)
 
     peak_price = day_info[1]
     min_price = day_info[4]
     max_price = day_info[5]
     mean_price = day_info[6]
     invest = None
-    max_profit = invested
 
     total_profit = 0
     max_profit = 0
 
     week_counter = 0
+                  
+    #[-1] is the last item on the list the Prediction -2 to 2 values
     week_predictions = [day_info[-1]]
 
     dys_with_loss = 0
@@ -251,24 +279,25 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
     prev_predict = day_info[-1]
     miss_colors = ['g']
 
-    while game_active == False:
+    while game_finished == False:
         if invest == None:
             invest = initial_investment = amount/2
-            user_key, day_info, amount, invested, profit, loss, game_active = stock_game(user_key=user_key, invest_amount=invest)
+            user_key, day_info, amount, invested, profit, loss, game_finished = stock_game(user_key=user_key, invest_amount=invest)
 
-            if game_active == True:
+            if game_finished == True:
                 break
         elif hold == True:
-            user_key, day_info, amount, invested, profit, loss, game_active = stock_game(user_key=user_key)
+            user_key, day_info, amount, invested, profit, loss, game_finished = stock_game(user_key=user_key)
 
-            if game_active == True:
+            if game_finished == True:
                 break
         elif hold == False:
-            user_key, day_info, amount, invested, profit, loss, game_active = stock_game(user_key=user_key, invest_amount=amount/4)
+            user_key, day_info, amount, invested, profit, loss, game_finished = stock_game(user_key=user_key, invest_amount=amount/4)
 
-            if game_active == True:
+            if game_finishede == True:
                 break
         if day_info[1] > peak_price:
+            #remember the highest price seen, ever.
             peak_price = day_info[1]
 
         if profit > 0:
@@ -279,10 +308,12 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
             dys_with_loss += 1
 
         if invested > max_profit:
+            #remember maximum profit ever made
             max_profit = invested
             amount_lost = 0
             hold = False
         else:
+            #hold as a value to act as a deterent
             amount_lost = max_profit - invested
             hold = True
 
@@ -338,7 +369,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
 
             if game_active == True:
                 break
-        elif count_ups == count_dips and dys_with_profit >0:
+        elif count_ups == count_dips and dys_with_profit > 0:
             user_key, day_info, amount, invested, profit, loss, game_active = stock_game(user_key=user_key, invest_amount=amount/10)
 
             if game_active == True:
@@ -359,7 +390,9 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
 
             if game_active == True:
                 break
-        if show_exception: #this is an exception that needs to be classified
+        
+        #a way to view the inside trends.
+        if show_exception:
             print('Ups in Week', count_ups, 'Downs in week', count_dips, 'Days with Profit', dys_with_profit, 'Days with Loss', dys_with_loss)
         
 
@@ -375,7 +408,6 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
             print('day: {0} profit: {1} loss: {2} amount: {3} invested: {4} predict: {5}'.format(day_info[0], profit, loss, amount, invested, day_info[-1]))
 
         prev_predict = day_info[-1]
-        #loss day: 1/24/2018 profit: 3.4399999999999977 loss: 0 amount: 950.0 invested: 36.94 predict: 0
         
         if loss > 0 and profit == 0:
             predictions[day_info[-1]]['loss'] += 1
@@ -384,6 +416,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
         elif profit == 0 and loss == 0:
             predictions[day_info[-1]]['draw'] += 1
         else:
+            #this is a unicorn event
             print('No match: day', day_info[0])
             print('day: {0} profit: {1.2f} loss: {2.2f} amount: {3.2f} invested: {4.2f} predict: {5.2f}'.format(day_info[0], profit, loss, amount, invested, day_info[-1]))
         
@@ -395,12 +428,13 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
             elif profit == 0 and loss == 0:
                 past_predictions[prev_predict]['draw'] += 1
             else:
+                #another unicorn event
                 print('No match: prev day', prev_predict[0])
                 print('day: {0} profit: {1.2f} loss: {2.2f} amount: {3.2f} invested: {4.2f} predict: {5.2f}'.format(day_info[0], profit, loss, amount, invested, day_info[-1]))
         
         if miss_plot:
-            low_ball = day_info[-1] == -75 or day_info[-1] == -50
-            high_ball = day_info[-1] == 50 or day_info[-1] == 0
+            low_ball = day_info[-1] < 0
+            high_ball = day_info[-1] >= 0
             
             if low_ball and profit > 0 or high_ball and loss > 0:
                 miss_colors.append('r')
@@ -408,8 +442,9 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
                 miss_colors.append('g')
         
         if miss_output:
-            low_ball = day_info[-1] == -75 or day_info[-1] == -50
-            high_ball = day_info[-1] == 50 or day_info[-1] == 0
+            low_ball = day_info[-1] < 0
+            high_ball = day_info[-1] >= 0
+
             if low_ball and profit > 0:
                 print('profit day: {0} profit: {1} loss: {2} amount: {3} invested: {4} predict: {5}'.format(day_info[0], profit, loss, amount, invested, day_info[-1]))
             elif high_ball and loss > 0:
@@ -452,6 +487,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
         
         #df_copy.plot(kind='scatter', x=df_copy.index.tolist(), y='amount', figsize=(20, 20), colormap=miss_colors)
         #plt.plot(x=df_copy.index, y=df_copy['Value USD'])
+        
         plt.scatter(x=index, y=df_copy.iloc[index]['Value USD'], c='r', s=80)
         plt.plot(df_copy.index, df_copy['Value USD'], 'g')
         plt.show()
@@ -461,6 +497,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
             #the len seems to be off by 3
             extended_invest = player_record['invest_history']
             extended_invest.extend([extended_invest[-1]]*3)
+
             extended_amount = player_record['amount_history']
             extended_amount.extend([extended_amount[-1]]*2)
             
@@ -468,6 +505,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
             df_copy['amount'] = extended_amount
             if kind == 'scatter':
                 df_copy.reset_index().plot(kind=kind, x='index', y=['investment', 'amount', 'Value USD'], figsize=(20, 20))
+            
             else:
                 df_copy.plot(kind=kind, x='time', y=['investment', 'amount', 'Value USD'], figsize=(20, 20))
         except Exception as e:
