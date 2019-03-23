@@ -94,7 +94,7 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
         
         if player_name not in game_record.keys():
             print('Player ID not Found, new record being created.')
-            game_record[player_name] = {
+            player_record = game_record[player_name] = {
                 'dys_without_activity': 0,
                 'amount': amount,
                 'last_game': 0,
@@ -108,7 +108,6 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
                 'amount_history': [],
             }
             
-            player_record = game_record[player_name]
         else:
             print('Old Player ID Found, data will be appended to it.)
             player_record = game_record[player_name]
@@ -131,7 +130,7 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
         else:
             
             print('Player ID not Found, new record being created.')
-            game_record[player_name] = {
+            player = game_record[player_name] = {
                 'dys_without_activity': 0,
                 'amount': amount,
                 'last_game': 0,
@@ -144,8 +143,6 @@ def stock_game(user_key=None, amount=1000, start_date=None, invest_amount=None, 
                 'invest_history': [],
                 'amount_history': [],
             }
-            
-            player_record = game_record[player_name]
         
         #move one day into the future
         player_record['current_date'] += 1
@@ -294,7 +291,7 @@ def player_2(start_date=None, sleep=False, sleep_time=1, plot=False, output=True
         elif hold == False:
             user_key, day_info, amount, invested, profit, loss, game_finished = stock_game(user_key=user_key, invest_amount=amount/4)
 
-            if game_finishede == True:
+            if game_finished == True:
                 break
         if day_info[1] > peak_price:
             #remember the highest price seen, ever.
